@@ -1,13 +1,18 @@
 /// This size of the field i.e. 2^8.
 const FIELD_SIZE: usize = 256;
 
+/// Size of the exponent table. The highest log value is FIELD_SIZE - 2
+/// so we decreased 2 from FIELD_SIZE. The table is repeated a 2nd time
+/// so fn multiply() doesn't have to check bounds.
+const EXP_TABLE_SIZE: usize = FIELD_SIZE * 2 - 2;
+
 /// The irreducible polynomial which is used to generate the log and 
 /// exp table. The possibilities are 29, 43, 45, 77, 95, 99, 101, 105,
 /// 113, 135, 141, 169, 195, 207, 231, and 245.
 const IRREDUCIBLE_POLYNOMIAL: usize = 29;
 
 /// Generate the log table given an irreducible polynomial which maps
-/// the elements of Galois field to their discrete logarithm. Since there is
+/// the elements of the Galois field to their discrete logarithm. Since there is
 /// no log for 0 so the entry in 0th index can be ignored.
 fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
     let mut res = [0 as u8; FIELD_SIZE];
@@ -24,6 +29,20 @@ fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
         if FIELD_SIZE <= b {
             b = (b - FIELD_SIZE) ^ irre_poly;
         }
+    }
+
+    res
+}
+/// Generate the exp table given the log table. The exp table maps logarithms
+/// to elements of the Galois field.
+fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
+    let mut res = [0 as u8; EXP_TABLE_SIZE];
+
+    for i in 1..FIELD_SIZE {
+        let log = log_table[i] as usize;
+        res[log] = i as u8;
+        // Populating the repeated table
+        res[log + FIELD_SIZE - 1] = i as u8;
     }
 
     res
@@ -71,6 +90,64 @@ mod tests {
             116,  214,  244,  234,  168,   80,   88,  175
         ];
         for i in 0..FIELD_SIZE {
+            assert_eq!(expected_res[i], res[i]);
+        }
+    }
+    #[test]
+    fn test_gen_exp_table() {
+        let expected_res: [u8; EXP_TABLE_SIZE] = [
+            1, 2, 4, 8, 16, 32, 64, 128, 29, 58, 116, 232,
+            205, 135, 19, 38, 76, 152, 45, 90, 180, 117, 234,
+            201, 143, 3, 6, 12, 24, 48, 96, 192, 157, 39, 
+            78, 156, 37, 74, 148, 53, 106, 212, 181, 119, 
+            238, 193, 159, 35, 70, 140, 5, 10, 20, 40, 80, 
+            160, 93, 186, 105, 210, 185, 111, 222, 161, 95, 
+            190, 97, 194, 153, 47, 94, 188, 101, 202, 137, 
+            15, 30, 60, 120, 240, 253, 231, 211, 187, 107, 
+            214, 177, 127, 254, 225, 223, 163, 91, 182, 113, 
+            226, 217, 175, 67, 134, 17, 34, 68, 136, 13, 26, 
+            52, 104, 208, 189, 103, 206, 129, 31, 62, 124, 248, 
+            237, 199, 147, 59, 118, 236, 197, 151, 51, 102, 
+            204, 133, 23, 46, 92, 184, 109, 218, 169, 79, 158, 
+            33, 66, 132, 21, 42, 84, 168, 77, 154, 41, 82, 
+            164, 85, 170, 73, 146, 57, 114, 228, 213, 183, 
+            115, 230, 209, 191, 99, 198, 145, 63, 126, 252, 
+            229, 215, 179, 123, 246, 241, 255, 227, 219, 171, 
+            75, 150, 49, 98, 196, 149, 55, 110, 220, 165, 87, 
+            174, 65, 130, 25, 50, 100, 200, 141, 7, 14, 28, 56, 
+            112, 224, 221, 167, 83, 166, 81, 162, 89, 178, 121, 
+            242, 249, 239, 195, 155, 43, 86, 172, 69, 138, 9,
+            18, 36, 72, 144, 61, 122, 244, 245, 247, 243, 251,
+            235, 203, 139, 11, 22, 44, 88, 176, 125, 250, 233, 
+            207, 131, 27, 54, 108, 216, 173, 71, 142, 
+            // Repeat the table a second time
+            1, 2, 4, 8, 16, 32, 64, 128, 29, 58, 116, 232, 205, 
+            135, 19, 38, 76, 152, 45, 90, 180, 117, 234, 201, 
+            143, 3, 6, 12, 24, 48, 96, 192, 157, 39, 78, 156, 
+            37, 74, 148, 53, 106, 212, 181, 119, 238, 193, 159, 
+            35, 70, 140, 5, 10, 20, 40, 80, 160, 93, 186, 105, 
+            210, 185, 111, 222, 161, 95, 190, 97, 194, 153, 47, 
+            94, 188, 101, 202, 137, 15, 30, 60, 120, 240, 253, 
+            231, 211, 187, 107, 214, 177, 127, 254, 225, 223, 
+            163, 91, 182, 113, 226, 217, 175, 67, 134, 17, 34, 
+            68, 136, 13, 26, 52, 104, 208, 189, 103, 206, 129, 
+            31, 62, 124, 248, 237, 199, 147, 59, 118, 236, 197, 
+            151, 51, 102, 204, 133, 23, 46, 92, 184, 109, 218, 
+            169, 79, 158, 33, 66, 132, 21, 42, 84, 168, 77, 154, 
+            41, 82, 164, 85, 170, 73, 146, 57, 114, 228, 213, 
+            183, 115, 230, 209, 191, 99, 198, 145, 63, 126, 252, 
+            229, 215, 179, 123, 246, 241, 255, 227, 219, 171, 
+            75, 150, 49, 98, 196, 149, 55, 110, 220, 165, 87, 
+            174, 65, 130, 25, 50, 100, 200, 141, 7, 14, 28, 56, 
+            112, 224, 221, 167, 83, 166, 81, 162, 89, 178, 121, 
+            242, 249, 239, 195, 155, 43, 86, 172, 69, 138, 9, 
+            18, 36, 72, 144, 61, 122, 244, 245, 247, 243, 251, 
+            235, 203, 139, 11, 22, 44, 88, 176, 125, 250, 233, 
+            207, 131, 27, 54, 108, 216, 173, 71, 142
+        ];
+        let log_table = gen_log_table(IRREDUCIBLE_POLYNOMIAL);
+        let res = gen_exp_table(&log_table);
+        for i in 0..EXP_TABLE_SIZE {
             assert_eq!(expected_res[i], res[i]);
         }
     }
