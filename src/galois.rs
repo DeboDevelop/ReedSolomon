@@ -3,7 +3,7 @@ const FIELD_SIZE: usize = 256;
 
 /// Size of the exponent table. The highest log value is FIELD_SIZE - 2
 /// so we decreased 2 from FIELD_SIZE. The table is repeated a 2nd time
-/// so fn multiply() doesn't have to check bounds.
+/// so fn mul() doesn't have to check bounds.
 const EXP_TABLE_SIZE: usize = FIELD_SIZE * 2 - 2;
 
 /// The irreducible polynomial which is used to generate the log and 
@@ -46,6 +46,17 @@ fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
     }
 
     res
+}
+
+fn mul(log_table: &[u8; FIELD_SIZE], exp_table: &[u8; EXP_TABLE_SIZE], a: u8, b: u8) -> u8 {
+    if a == 0 || b == 0 {
+        0
+    } else {
+        let log_a = log_table[a as usize];
+        let log_b = log_table[b as usize];
+        let log_res = log_a as usize + log_b as usize;
+        exp_table[log_res]
+    }
 }
 
 #[cfg(test)]
@@ -150,5 +161,13 @@ mod tests {
         for i in 0..EXP_TABLE_SIZE {
             assert_eq!(expected_res[i], res[i]);
         }
+    }
+    #[test]
+    fn test_mul() {
+        let log_table = gen_log_table(IRREDUCIBLE_POLYNOMIAL);
+        let exp_table = gen_exp_table(&log_table);
+        assert_eq!(12, mul(&log_table, &exp_table, 3, 4));
+        assert_eq!(21, mul(&log_table, &exp_table, 7, 7));
+        assert_eq!(41, mul(&log_table, &exp_table, 23, 45));
     }
 }
