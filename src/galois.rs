@@ -14,7 +14,17 @@ const IRREDUCIBLE_POLYNOMIAL: usize = 29;
 /// Generate the log table given an irreducible polynomial which maps
 /// the elements of the Galois field to their discrete logarithm. Since there is
 /// no log for 0 so the entry in 0th index can be ignored.
-fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
+/// # Arguments
+///
+/// * `irre_poly` - An irreducible polynomial for GF(2^8)
+///
+/// # Example
+/// ```
+/// use reed_solomon::galois::gen_log_table;
+/// 
+/// let log_table = gen_log_table(29);
+/// ```
+pub fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
     let mut res = [0 as u8; FIELD_SIZE];
     // Primitive element
     let mut b: usize = 1;
@@ -35,7 +45,19 @@ fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
 }
 /// Generate the exp table given the log table. The exp table maps logarithms
 /// to elements of the Galois field.
-fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
+/// # Arguments
+///
+/// * `log_table` - The log table for GF(2^8)
+///
+/// # Example
+/// ```
+/// use reed_solomon::galois::gen_exp_table;
+/// use reed_solomon::galois::gen_log_table;
+/// 
+/// let log_table = gen_log_table(29);
+/// let exp_table = gen_exp_table(&log_table);
+/// ```
+pub fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
     let mut res = [0 as u8; EXP_TABLE_SIZE];
 
     for i in 1..FIELD_SIZE {
@@ -49,23 +71,95 @@ fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
 }
 
 /// Adds 2 elements in the field.
-fn add(a: u8, b: u8) -> u8 {
+/// # Arguments
+///
+/// * `a` - First element to be added
+/// * `b` - Second element to be added
+///
+/// # Example
+/// ```
+/// use reed_solomon::galois::add;
+/// 
+/// let res = add(1, 1);
+/// ```
+pub fn add(a: u8, b: u8) -> u8 {
     a ^ b
 }
 
 /// Subtract 1 element from another in the field.
-fn sub(a: u8, b: u8) -> u8 {
+/// # Arguments
+///
+/// * `a` - Minuend
+/// * `b` - Subtrahend
+///
+/// # Example
+/// ```
+/// use reed_solomon::galois::sub;
+/// 
+/// let res = sub(1, 1);
+/// ```
+pub fn sub(a: u8, b: u8) -> u8 {
     a ^ b
 }
 
 /// Multiplies 2 elements in the field.
-fn mul(log_table: &[u8; FIELD_SIZE], exp_table: &[u8; EXP_TABLE_SIZE], a: u8, b: u8) -> u8 {
+/// # Arguments
+///
+/// * `log_table` - The log table for GF(2^8)
+/// * `exp_table` - The exp table for GF(2^8)
+/// * `a` - First element to be multiplied
+/// * `b` - Second element to be multiplied
+///
+/// # Example
+/// ```
+/// use reed_solomon::galois::gen_exp_table;
+/// use reed_solomon::galois::gen_log_table;
+/// use reed_solomon::galois::mul;
+/// 
+/// let log_table = gen_log_table(29);
+/// let exp_table = gen_exp_table(&log_table);
+/// let res = mul(&log_table, &exp_table, 1, 1);
+/// ```
+pub fn mul(log_table: &[u8; FIELD_SIZE], exp_table: &[u8; EXP_TABLE_SIZE], a: u8, b: u8) -> u8 {
     if a == 0 || b == 0 {
         0
     } else {
         let log_a = log_table[a as usize];
         let log_b = log_table[b as usize];
         let log_res = log_a as usize + log_b as usize;
+        exp_table[log_res]
+    }
+}
+
+/// Computes a^n in Galois field
+/// # Arguments
+///
+/// * `log_table` - The log table for GF(2^8)
+/// * `exp_table` - The exp table for GF(2^8)
+/// * `a` - Base element
+/// * `b` - Exponent element
+///
+/// # Example
+/// ```
+/// use reed_solomon::galois::gen_exp_table;
+/// use reed_solomon::galois::gen_log_table;
+/// use reed_solomon::galois::exp;
+/// 
+/// let log_table = gen_log_table(29);
+/// let exp_table = gen_exp_table(&log_table);
+/// let res = exp(&log_table, &exp_table, 2, 2);
+/// ```
+pub fn exp(log_table: &[u8; FIELD_SIZE], exp_table: &[u8; EXP_TABLE_SIZE], a: u8, n: usize) -> u8 {
+    if n == 0 {
+        1
+    } else if a == 0 {
+        0
+    } else {
+        let log_a = log_table[a as usize];
+        let mut log_res = log_a as usize * n;
+        while 255 <= log_res {
+            log_res -= 255;
+        }
         exp_table[log_res]
     }
 }
@@ -174,14 +268,6 @@ mod tests {
         }
     }
     #[test]
-    fn test_mul() {
-        let log_table = gen_log_table(IRREDUCIBLE_POLYNOMIAL);
-        let exp_table = gen_exp_table(&log_table);
-        assert_eq!(12, mul(&log_table, &exp_table, 3, 4));
-        assert_eq!(21, mul(&log_table, &exp_table, 7, 7));
-        assert_eq!(41, mul(&log_table, &exp_table, 23, 45));
-    }
-    #[test]
     fn test_add() {
         assert_eq!(0, add(1, 1));
         assert_eq!(26, add(21, 15));
@@ -192,5 +278,21 @@ mod tests {
         assert_eq!(0, sub(1, 1));
         assert_eq!(26, sub(21, 15));
         assert_eq!(68, sub(120, 60));
+    }
+    #[test]
+    fn test_mul() {
+        let log_table = gen_log_table(IRREDUCIBLE_POLYNOMIAL);
+        let exp_table = gen_exp_table(&log_table);
+        assert_eq!(12, mul(&log_table, &exp_table, 3, 4));
+        assert_eq!(21, mul(&log_table, &exp_table, 7, 7));
+        assert_eq!(41, mul(&log_table, &exp_table, 23, 45));
+    }
+    #[test]
+    fn test_exp() {
+        let log_table = gen_log_table(IRREDUCIBLE_POLYNOMIAL);
+        let exp_table = gen_exp_table(&log_table);
+        assert_eq!(4, exp(&log_table, &exp_table, 2, 2));
+        assert_eq!(235, exp(&log_table, &exp_table, 5, 20));
+        assert_eq!(43, exp(&log_table, &exp_table, 13, 7));
     }
 }
