@@ -48,6 +48,17 @@ fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
     res
 }
 
+/// Adds 2 elements in the field.
+fn add(a: u8, b: u8) -> u8 {
+    a ^ b
+}
+
+/// Subtract 1 element from another in the field.
+fn sub(a: u8, b: u8) -> u8 {
+    a ^ b
+}
+
+/// Multiplies 2 elements in the field.
 fn mul(log_table: &[u8; FIELD_SIZE], exp_table: &[u8; EXP_TABLE_SIZE], a: u8, b: u8) -> u8 {
     if a == 0 || b == 0 {
         0
@@ -169,5 +180,17 @@ mod tests {
         assert_eq!(12, mul(&log_table, &exp_table, 3, 4));
         assert_eq!(21, mul(&log_table, &exp_table, 7, 7));
         assert_eq!(41, mul(&log_table, &exp_table, 23, 45));
+    }
+    #[test]
+    fn test_add() {
+        assert_eq!(0, add(1, 1));
+        assert_eq!(26, add(21, 15));
+        assert_eq!(68, add(120, 60));
+    }
+    #[test]
+    fn test_sub() {
+        assert_eq!(0, sub(1, 1));
+        assert_eq!(26, sub(21, 15));
+        assert_eq!(68, sub(120, 60));
     }
 }
