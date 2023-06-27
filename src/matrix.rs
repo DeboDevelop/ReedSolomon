@@ -79,6 +79,36 @@ impl Matrix {
 
         Matrix { rows, cols, data }
     }
+
+    /// Create a new sub matrix from the given matrix (self), r_start, 
+    /// r_end, c_start, c_end.
+    /// # Arguments
+    ///
+    /// * `r_start` - Starting index of the row in given matrix
+    /// * `r_end` - Ending index of the row in given matrix
+    /// * `c_start` - Starting index of the col in given matrix
+    /// * `c_end` - Ending index of the col in given matrix
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::matrix::Matrix;
+    /// 
+    /// let matrix = Matrix::new_identity(3);
+    /// let sub_matrix = matrix.new_sub_matrix(1, 3, 1, 3);
+    /// ```
+    pub fn new_sub_matrix(&self, r_start: usize, r_end: usize, c_start: usize, c_end: usize) -> Matrix {
+        let rows = r_end - r_start;
+        let cols = c_end - c_start;
+        let mut data: Vec<Vec<u8>> = vec![vec![0; cols]; rows];
+
+        for r in r_start..r_end {
+            for c in c_start..c_end {
+                data[r - r_start][c - c_start] = self.data[r][c];
+            }
+        }
+
+        Matrix { rows, cols, data }
+    }
 }
 
 #[cfg(test)]
@@ -128,6 +158,23 @@ mod tests {
         assert_eq!(matrix.data.len(), 3);
         assert_eq!(matrix.data[0].len(), 3);
         for (row_index, row) in matrix.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_new_sub_matrix() {
+        let gf8 = GaloisField::new();
+        let matrix = Matrix::new_vandermonde(3, 3, gf8);
+        let sub_matrix = matrix.new_sub_matrix(1, matrix.rows, 1, matrix.cols);
+        let exp_res: [[u8; 2]; 2] = [[1, 1], [2, 4]];
+
+        assert_eq!(sub_matrix.rows, 2);
+        assert_eq!(sub_matrix.cols, 2);
+        assert_eq!(sub_matrix.data.len(), 2);
+        assert_eq!(sub_matrix.data[0].len(), 2);
+        for (row_index, row) in sub_matrix.data.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
                 assert_eq!(exp_res[row_index][col_index], elem);
             }
