@@ -143,7 +143,7 @@ impl GaloisField {
     /// # Example
     /// ```
     /// use reed_solomon::galois::GaloisField;
-    /// 
+    ///
     /// let gf8 = GaloisField::new();
     /// let res = gf8.mul(1, 1);
     /// ```
@@ -167,15 +167,11 @@ impl GaloisField {
     /// # Example
     /// ```
     /// use reed_solomon::galois::GaloisField;
-    /// 
+    ///
     /// let gf8 = GaloisField::new();
     /// let res = gf8.exp(2, 2);
     /// ```
-    pub fn exp(
-        &self,
-        a: u8,
-        n: usize,
-    ) -> u8 {
+    pub fn exp(&self, a: u8, n: usize) -> u8 {
         if n == 0 {
             1
         } else if a == 0 {
