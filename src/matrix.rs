@@ -109,6 +109,41 @@ impl Matrix {
 
         Matrix { rows, cols, data }
     }
+
+    /// Create a new augmented matrix from the given Matrices - self, right.
+    /// # Arguments
+    ///
+    /// * `right` - Right side of the augmented matrix.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::matrix::Matrix;
+    /// 
+    /// let left = Matrix::new_identity(3);
+    /// let right = Matrix::new_identity(3);
+    /// let augmented_matrix = left.new_augmented_matrix(right);
+    /// ```
+    pub fn new_augmented_matrix(&self, right: Matrix) -> Matrix {
+        if self.rows != right.rows {
+            panic!(
+                "Row count of the matrices must match. Current row count, left: {}, right: {}",
+                self.rows, right.rows
+            )
+        }
+
+        let cols = self.cols + right.cols;
+        let mut data: Vec<Vec<u8>> = vec![vec![0; cols]; self.rows];
+        for r in 0..self.rows {
+            for c in 0..self.cols {
+                data[r][c] = self.data[r][c];
+            }
+            for c in 0..right.cols {
+                data[r][self.cols + c] = right.data[r][c];
+            }
+        }
+
+        Matrix { rows: self.rows, cols, data }
+    }
 }
 
 #[cfg(test)]
@@ -175,6 +210,24 @@ mod tests {
         assert_eq!(sub_matrix.data.len(), 2);
         assert_eq!(sub_matrix.data[0].len(), 2);
         for (row_index, row) in sub_matrix.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_new_augmented_matrix() {
+        let gf8 = GaloisField::new();
+        let left = Matrix::new_vandermonde(3, 3, gf8);
+        let right = Matrix::new_identity(3);
+        let res = left.new_augmented_matrix(right);
+        let exp_res: [[u8; 6]; 3] = [[1, 0, 0, 1, 0, 0], [1, 1, 1, 0, 1, 0], [1, 2, 4, 0, 0, 1]];
+
+        assert_eq!(res.rows, 3);
+        assert_eq!(res.cols, 6);
+        assert_eq!(res.data.len(), 3);
+        assert_eq!(res.data[0].len(), 6);
+        for (row_index, row) in res.data.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
                 assert_eq!(exp_res[row_index][col_index], elem);
             }
