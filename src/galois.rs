@@ -11,6 +11,7 @@ const EXP_TABLE_SIZE: usize = FIELD_SIZE * 2 - 2;
 /// 113, 135, 141, 169, 195, 207, 231, and 245.
 const IRREDUCIBLE_POLYNOMIAL: usize = 29;
 
+#[derive(Copy, Clone)]
 pub struct GaloisField {
     field_size: usize,
     irre_poly: usize,
@@ -135,8 +136,6 @@ impl GaloisField {
     /// Multiplies 2 elements in the field.
     /// # Arguments
     ///
-    /// * `log_table` - The log table for GF(2^8)
-    /// * `exp_table` - The exp table for GF(2^8)
     /// * `a` - First element to be multiplied
     /// * `b` - Second element to be multiplied
     ///
@@ -158,11 +157,40 @@ impl GaloisField {
         }
     }
 
+    /// Divides 2 elements in Galois field
+    /// # Arguments
+    ///
+    /// * `a` - dividend
+    /// * `b` - divisor
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::galois::GaloisField;
+    ///
+    /// let gf8 = GaloisField::new();
+    /// let res = gf8.div(4, 2);
+    /// ```
+    pub fn div(&self, a: u8, b: u8) -> u8 {
+        if a == 0 {
+            0
+        } else if b == 0 {
+            panic!("Can't divide by 0");
+        } else {
+            let log_a = self.log_table[a as usize];
+            let log_b = self.log_table[b as usize];
+            let mut log_res = log_a as isize - log_b as isize;
+            if log_res < 0 {
+                log_res += 255;
+            }
+            self.exp_table[log_res as usize]
+        }
+    }
+
     /// Computes a^n in Galois field
     /// # Arguments
     ///
     /// * `a` - Base element
-    /// * `b` - Exponent element
+    /// * `n` - Exponent element
     ///
     /// # Example
     /// ```
@@ -291,5 +319,12 @@ mod tests {
         assert_eq!(4, gf8.exp(2, 2));
         assert_eq!(235, gf8.exp(5, 20));
         assert_eq!(43, gf8.exp(13, 7));
+    }
+    #[test]
+    fn test_div() {
+        let gf8 = GaloisField::new();
+        assert_eq!(2, gf8.div(4, 2));
+        assert_eq!(16, gf8.div(128, 8));
+        assert_eq!(33, gf8.div(99, 3));
     }
 }
