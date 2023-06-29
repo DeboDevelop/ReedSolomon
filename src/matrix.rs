@@ -1,7 +1,7 @@
 use crate::galois::GaloisField;
 
 /// A struct to represent Matrix
-pub struct Matrix {
+pub(crate) struct Matrix {
     rows: usize,
     cols: usize,
     data: Vec<Vec<u8>>,
@@ -16,11 +16,11 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::matrix::Matrix;
     ///
     /// let matrix = Matrix::new(3, 3);
     /// ```
-    pub fn new(rows: usize, cols: usize) -> Matrix {
+    pub(crate) fn new(rows: usize, cols: usize) -> Matrix {
         let data: Vec<Vec<u8>> = vec![vec![0; cols]; rows];
 
         Matrix { rows, cols, data }
@@ -33,11 +33,11 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::matrix::Matrix;
     ///
     /// let matrix = Matrix::new_from_data(vec![vec![1, 2, 3], vec![1, 2, 3]]);
     /// ```
-    pub fn new_from_data(data: Vec<Vec<u8>>) -> Matrix {
+    pub(crate) fn new_from_data(data: Vec<Vec<u8>>) -> Matrix {
         Matrix {
             rows: data.len(),
             cols: data[0].len(),
@@ -53,11 +53,11 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::matrix::Matrix;
     ///
     /// let matrix = Matrix::new_identity(3);
     /// ```
-    pub fn new_identity(size: usize) -> Matrix {
+    pub(crate) fn new_identity(size: usize) -> Matrix {
         let mut data: Vec<Vec<u8>> = vec![vec![0; size]; size];
 
         for i in 0..size {
@@ -81,13 +81,13 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
-    /// use reed_solomon::galois::GaloisField;
+    /// use crate::matrix::Matrix;
+    /// use crate::galois::GaloisField;
     ///
     /// let gf8 = GaloisField::new();
     /// let matrix = Matrix::new_vandermonde(3, 3, gf8);
     /// ```
-    pub fn new_vandermonde(rows: usize, cols: usize, gf: GaloisField) -> Matrix {
+    pub(crate) fn new_vandermonde(rows: usize, cols: usize, gf: GaloisField) -> Matrix {
         let mut data: Vec<Vec<u8>> = vec![vec![0; cols]; rows];
 
         for r in 0..rows {
@@ -110,12 +110,12 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::matrix::Matrix;
     ///
     /// let matrix = Matrix::new_identity(3);
     /// let sub_matrix = matrix.new_sub_matrix(1, 3, 1, 3);
     /// ```
-    pub fn new_sub_matrix(
+    pub(crate) fn new_sub_matrix(
         &self,
         r_start: usize,
         r_end: usize,
@@ -142,13 +142,13 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::matrix::Matrix;
     ///
     /// let left = Matrix::new_identity(3);
     /// let right = Matrix::new_identity(3);
     /// let augmented_matrix = left.new_augmented_matrix(right);
     /// ```
-    pub fn new_augmented_matrix(&self, right: Matrix) -> Matrix {
+    pub(crate) fn new_augmented_matrix(&self, right: Matrix) -> Matrix {
         if self.rows != right.rows {
             panic!(
                 "Row count of the matrices must match. Current row count, left: {}, right: {}",
@@ -182,13 +182,13 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::matrix::Matrix;
     ///
     /// let left = Matrix::new_identity(3);
     /// let right = Matrix::new_identity(3);
     /// let multiplied_matrix = left.mul(right);
     /// ```
-    pub fn mul(&self, right: Matrix, gf: GaloisField) -> Matrix {
+    pub(crate) fn mul(&self, right: Matrix, gf: GaloisField) -> Matrix {
         if self.cols != right.rows {
             panic!(
                 "Colomn count on left has to be same as row count on right. left column: {}, right row: {}",
@@ -218,14 +218,14 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::galois::GaloisField;
+    /// use crate::matrix::Matrix;
     ///
     /// let matrix = Matrix::new_from_data(vec![vec![56, 23, 98], vec![3, 100, 200], vec![45, 201, 123]]);
     /// let gf8 = GaloisField::new();
     /// let inv_matrix = matrix.invert(gf8);
     /// ```
-    pub fn invert(&self, gf: GaloisField) -> Matrix {
+    pub(crate) fn invert(&self, gf: GaloisField) -> Matrix {
         if self.rows != self.cols {
             panic!("Can't invert a non-square matrix")
         }
@@ -247,7 +247,7 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::matrix::Matrix;
     ///
     /// let matrix = Matrix::new_identity(3);
     /// matrix.swap_rows(0, 1);
@@ -267,8 +267,8 @@ impl Matrix {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
-    /// use reed_solomon::matrix::Matrix;
+    /// use crate::galois::GaloisField;
+    /// use crate::matrix::Matrix;
     ///
     /// let matrix = Matrix::new_from_data(vec![vec![56, 23, 98], vec![3, 100, 200], vec![45, 201, 123]]);
     /// let gf8 = GaloisField::new();

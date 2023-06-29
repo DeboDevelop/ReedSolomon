@@ -12,7 +12,7 @@ const EXP_TABLE_SIZE: usize = FIELD_SIZE * 2 - 2;
 const IRREDUCIBLE_POLYNOMIAL: usize = 29;
 
 #[derive(Copy, Clone)]
-pub struct GaloisField {
+pub(crate) struct GaloisField {
     field_size: usize,
     irre_poly: usize,
     exp_table_size: usize,
@@ -29,11 +29,11 @@ pub struct GaloisField {
 ///
 /// # Example
 /// ```
-/// use reed_solomon::galois::gen_log_table;
+/// use crate::galois::gen_log_table;
 ///
 /// let log_table = gen_log_table(29);
 /// ```
-pub fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
+pub(crate) fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
     let mut res = [0 as u8; FIELD_SIZE];
     // Primitive element
     let mut b: usize = 1;
@@ -60,13 +60,13 @@ pub fn gen_log_table(irre_poly: usize) -> [u8; FIELD_SIZE] {
 ///
 /// # Example
 /// ```
-/// use reed_solomon::galois::gen_exp_table;
-/// use reed_solomon::galois::gen_log_table;
+/// use crate::galois::gen_exp_table;
+/// use crate::galois::gen_log_table;
 ///
 /// let log_table = gen_log_table(29);
 /// let exp_table = gen_exp_table(&log_table);
 /// ```
-pub fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
+pub(crate) fn gen_exp_table(log_table: &[u8; FIELD_SIZE]) -> [u8; EXP_TABLE_SIZE] {
     let mut res = [0 as u8; EXP_TABLE_SIZE];
 
     for i in 1..FIELD_SIZE {
@@ -84,11 +84,11 @@ impl GaloisField {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
+    /// use crate::galois::GaloisField;
     ///
     /// let gf8 = GaloisField::new();
     /// ```
-    pub fn new() -> GaloisField {
+    pub(crate) fn new() -> GaloisField {
         let log_table = gen_log_table(IRREDUCIBLE_POLYNOMIAL);
         let exp_table = gen_exp_table(&log_table);
 
@@ -109,11 +109,11 @@ impl GaloisField {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
+    /// use crate::galois::GaloisField;
     ///
     /// let res = GaloisField::add(1, 1);
     /// ```
-    pub fn add(a: u8, b: u8) -> u8 {
+    pub(crate) fn add(a: u8, b: u8) -> u8 {
         a ^ b
     }
 
@@ -125,11 +125,11 @@ impl GaloisField {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
+    /// use crate::galois::GaloisField;
     ///
     /// let res = GaloisField::sub(1, 1);
     /// ```
-    pub fn sub(a: u8, b: u8) -> u8 {
+    pub(crate) fn sub(a: u8, b: u8) -> u8 {
         a ^ b
     }
 
@@ -141,12 +141,12 @@ impl GaloisField {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
+    /// use crate::galois::GaloisField;
     ///
     /// let gf8 = GaloisField::new();
     /// let res = gf8.mul(1, 1);
     /// ```
-    pub fn mul(&self, a: u8, b: u8) -> u8 {
+    pub(crate) fn mul(&self, a: u8, b: u8) -> u8 {
         if a == 0 || b == 0 {
             0
         } else {
@@ -165,12 +165,12 @@ impl GaloisField {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
+    /// use crate::galois::GaloisField;
     ///
     /// let gf8 = GaloisField::new();
     /// let res = gf8.div(4, 2);
     /// ```
-    pub fn div(&self, a: u8, b: u8) -> u8 {
+    pub(crate) fn div(&self, a: u8, b: u8) -> u8 {
         if a == 0 {
             0
         } else if b == 0 {
@@ -194,12 +194,12 @@ impl GaloisField {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::galois::GaloisField;
+    /// use crate::galois::GaloisField;
     ///
     /// let gf8 = GaloisField::new();
     /// let res = gf8.exp(2, 2);
     /// ```
-    pub fn exp(&self, a: u8, n: usize) -> u8 {
+    pub(crate) fn exp(&self, a: u8, n: usize) -> u8 {
         if n == 0 {
             1
         } else if a == 0 {
