@@ -26,6 +26,25 @@ impl Matrix {
         Matrix { rows, cols, data }
     }
 
+    /// Create a new matrix from the given data.
+    /// # Arguments
+    ///
+    /// * `data` - Matrix data
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::matrix::Matrix;
+    ///
+    /// let matrix = Matrix::new_from_data(vec![vec![1, 2, 3], vec![1, 2, 3]]);
+    /// ```
+    pub fn new_from_data(data: Vec<Vec<u8>>) -> Matrix {
+        Matrix {
+            rows: data.len(),
+            cols: data[0].len(),
+            data,
+        }
+    }
+
     /// Create a new identity matrix and fill the primary diagonal
     /// with 1 and the rest with 0s.
     /// # Arguments
@@ -64,7 +83,7 @@ impl Matrix {
     /// ```
     /// use reed_solomon::matrix::Matrix;
     /// use reed_solomon::galois::GaloisField;
-    /// 
+    ///
     /// let gf8 = GaloisField::new();
     /// let matrix = Matrix::new_vandermonde(3, 3, gf8);
     /// ```
@@ -80,7 +99,7 @@ impl Matrix {
         Matrix { rows, cols, data }
     }
 
-    /// Create a new sub matrix from the given matrix (self), r_start, 
+    /// Create a new sub matrix from the given matrix (self), r_start,
     /// r_end, c_start, c_end.
     /// # Arguments
     ///
@@ -92,11 +111,17 @@ impl Matrix {
     /// # Example
     /// ```
     /// use reed_solomon::matrix::Matrix;
-    /// 
+    ///
     /// let matrix = Matrix::new_identity(3);
     /// let sub_matrix = matrix.new_sub_matrix(1, 3, 1, 3);
     /// ```
-    pub fn new_sub_matrix(&self, r_start: usize, r_end: usize, c_start: usize, c_end: usize) -> Matrix {
+    pub fn new_sub_matrix(
+        &self,
+        r_start: usize,
+        r_end: usize,
+        c_start: usize,
+        c_end: usize,
+    ) -> Matrix {
         let rows = r_end - r_start;
         let cols = c_end - c_start;
         let mut data: Vec<Vec<u8>> = vec![vec![0; cols]; rows];
@@ -118,7 +143,7 @@ impl Matrix {
     /// # Example
     /// ```
     /// use reed_solomon::matrix::Matrix;
-    /// 
+    ///
     /// let left = Matrix::new_identity(3);
     /// let right = Matrix::new_identity(3);
     /// let augmented_matrix = left.new_augmented_matrix(right);
@@ -142,7 +167,47 @@ impl Matrix {
             }
         }
 
-        Matrix { rows: self.rows, cols, data }
+        Matrix {
+            rows: self.rows,
+            cols,
+            data,
+        }
+    }
+
+    /// Multiply given 2 matrices - self, right.
+    /// # Arguments
+    ///
+    /// * `right` - 2nd matrix to be multiplied.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::matrix::Matrix;
+    ///
+    /// let left = Matrix::new_identity(3);
+    /// let right = Matrix::new_identity(3);
+    /// let multiplied_matrix = left.mul(right);
+    /// ```
+    pub fn mul(&self, right: Matrix, gf: GaloisField) -> Matrix {
+        if self.cols != right.rows {
+            panic!(
+                "Colomn count on left has to be same as row count on right. left column: {}, right row: {}",
+                self.cols, right.rows
+            )
+        }
+
+        let mut res = Matrix::new(self.rows, right.cols);
+        for r in 0..self.rows {
+            for c in 0..right.cols {
+                let mut value: u8 = 0;
+                for lc in 0..self.cols {
+                    let m = gf.mul(self.data[r][lc], right.data[lc][c]);
+                    value = GaloisField::add(value, m);
+                }
+                res.data[r][c] = value;
+            }
+        }
+
+        res
     }
 }
 
@@ -161,6 +226,20 @@ mod tests {
         for row in matrix.data.iter() {
             for &elem in row.iter() {
                 assert_eq!(0, elem);
+            }
+        }
+    }
+    #[test]
+    fn test_new_from_data() {
+        let matrix = Matrix::new_from_data(vec![vec![1, 1, 1], vec![1, 1, 1]]);
+
+        assert_eq!(matrix.rows, 2);
+        assert_eq!(matrix.cols, 3);
+        assert_eq!(matrix.data.len(), 2);
+        assert_eq!(matrix.data[0].len(), 3);
+        for row in matrix.data.iter() {
+            for &elem in row.iter() {
+                assert_eq!(1, elem);
             }
         }
     }
@@ -227,6 +306,24 @@ mod tests {
         assert_eq!(res.cols, 6);
         assert_eq!(res.data.len(), 3);
         assert_eq!(res.data[0].len(), 6);
+        for (row_index, row) in res.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_mul() {
+        let gf8 = GaloisField::new();
+        let left = Matrix::new_from_data(vec![vec![1, 2], vec![3, 4]]);
+        let right = Matrix::new_from_data(vec![vec![5, 6], vec![7, 8]]);
+        let res = left.mul(right, gf8);
+        let exp_res: [[u8; 2]; 2] = [[11, 22], [19, 42]];
+
+        assert_eq!(res.rows, 2);
+        assert_eq!(res.cols, 2);
+        assert_eq!(res.data.len(), 2);
+        assert_eq!(res.data[0].len(), 2);
         for (row_index, row) in res.data.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
                 assert_eq!(exp_res[row_index][col_index], elem);
