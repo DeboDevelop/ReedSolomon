@@ -178,6 +178,7 @@ impl Matrix {
     /// # Arguments
     ///
     /// * `right` - 2nd matrix to be multiplied.
+    /// * `gf` - Galois Field where the multiplication will occur.
     ///
     /// # Example
     /// ```
@@ -208,6 +209,121 @@ impl Matrix {
         }
 
         res
+    }
+
+    /// Returns the inverted matrix of self.
+    /// # Arguments
+    ///
+    /// * `gf` - Galois Field where the multiplication will occur.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::galois::GaloisField;
+    /// use reed_solomon::matrix::Matrix;
+    ///
+    /// let matrix = Matrix::new_from_data(vec![vec![56, 23, 98], vec![3, 100, 200], vec![45, 201, 123]]);
+    /// let gf8 = GaloisField::new();
+    /// let inv_matrix = matrix.invert(gf8);
+    /// ```
+    pub fn invert(&self, gf: GaloisField) -> Matrix {
+        if self.rows != self.cols {
+            panic!("Can't invert a non-square matrix")
+        }
+        // Create a working matrix by augmenting this one with an identity matrix on the right.
+        let mut work = self.new_augmented_matrix(Matrix::new_identity(self.rows));
+
+        // Do Gaussian elimination to transform the left half into an identity matrix.
+        work.gauss_elim(gf);
+
+        // The right half is now the inverse.
+        work.new_sub_matrix(0, self.rows, self.cols, self.cols * 2)
+    }
+
+    /// Swap two given rows of Matrix data.
+    /// # Arguments
+    ///
+    /// * `row1` - 1st row to be swapped in the given matrix.
+    /// * `row2` - 2nd row to be swapped in the given matrix.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::matrix::Matrix;
+    ///
+    /// let matrix = Matrix::new_identity(3);
+    /// matrix.swap_rows(0, 1);
+    /// ```
+    fn swap_rows(&mut self, row1: usize, row2: usize) {
+        if row1 == row2 {
+            return;
+        }
+
+        self.data.swap(row1, row2);
+    }
+
+    /// Perform Gaussian Elimination on the given matrix (self)
+    /// # Arguments
+    ///
+    /// * `gf` - Galois Field where the multiplication will occur.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::galois::GaloisField;
+    /// use reed_solomon::matrix::Matrix;
+    ///
+    /// let matrix = Matrix::new_from_data(vec![vec![56, 23, 98], vec![3, 100, 200], vec![45, 201, 123]]);
+    /// let gf8 = GaloisField::new();
+    /// matrix.gauss_elim(gf8);
+    /// ```
+    fn gauss_elim(&mut self, gf: GaloisField) {
+        // Clear out the part below the main diagonal and scale the main
+        // diagonal to be 1.
+        for r in 0..self.rows {
+            // If the element on the diagonal is 0, find a row below
+            // that has a non-zero and swap them.
+            if self.data[r][r] == 0 {
+                for r_below in r + 1..self.rows {
+                    if self.data[r_below][r] != 0 {
+                        self.swap_rows(r_below, r);
+                        break;
+                    }
+                }
+            }
+            // If we couldn't find one, the matrix is singular.
+            if self.data[r][r] == 0 {
+                panic!("The given matrix is singular");
+            }
+            // Scale to 1.
+            if self.data[r][r] != 1 {
+                let scale = gf.div(1, self.data[r][r]);
+                for c in 0..self.cols {
+                    self.data[r][c] = gf.mul(self.data[r][c], scale)
+                }
+            }
+            // Make everything below the 1 be a 0 by subtracting
+            // a multiple of it.  (Subtraction and addition are
+            // both exclusive or in the Galois field.)
+            for r_below in r + 1..self.rows {
+                if self.data[r_below][r] != 0 {
+                    let scale = self.data[r_below][r];
+                    for c in 0..self.cols {
+                        let m = gf.mul(scale, self.data[r][c]);
+                        self.data[r_below][c] = GaloisField::add(self.data[r_below][c], m);
+                    }
+                }
+            }
+        }
+        // Now clear the part above the main diagonal.
+        for d in 0..self.rows {
+            for r_above in 0..d {
+                if self.data[r_above][d] != 0 {
+                    let scale = self.data[r_above][d];
+                    for c in 0..self.cols {
+                        let m = gf.mul(scale, self.data[d][c]);
+                        self.data[r_above][c] = GaloisField::add(self.data[r_above][c], m);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -327,6 +443,49 @@ mod tests {
         for (row_index, row) in res.data.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
                 assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_new_swap() {
+        let gf8 = GaloisField::new();
+        let mut matrix = Matrix::new_vandermonde(3, 3, gf8);
+        matrix.swap_rows(0, 1);
+        let exp_res: [[u8; 3]; 3] = [[1, 1, 1], [1, 0, 0], [1, 2, 4]];
+
+        assert_eq!(matrix.rows, 3);
+        assert_eq!(matrix.cols, 3);
+        assert_eq!(matrix.data.len(), 3);
+        assert_eq!(matrix.data[0].len(), 3);
+        for (row_index, row) in matrix.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_invert() {
+        let gf8 = GaloisField::new();
+        let matrix = Matrix::new_from_data(vec![
+            vec![56, 23, 98],
+            vec![3, 100, 200],
+            vec![45, 201, 123],
+        ]);
+        let res = matrix.invert(gf8);
+        let exp_res: [[u8; 3]; 3] = [[175, 133, 33], [130, 13, 245], [112, 35, 126]];
+        let iden = Matrix::new_identity(matrix.rows);
+
+        for (row_index, row) in res.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+
+        let mul = matrix.mul(res, gf8);
+
+        for (row_index, row) in iden.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(mul.data[row_index][col_index], elem);
             }
         }
     }
