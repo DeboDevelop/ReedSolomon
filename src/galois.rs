@@ -11,6 +11,7 @@ const EXP_TABLE_SIZE: usize = FIELD_SIZE * 2 - 2;
 /// 113, 135, 141, 169, 195, 207, 231, and 245.
 const IRREDUCIBLE_POLYNOMIAL: usize = 29;
 
+/// A Struct to represent the Galois Field
 #[derive(Copy, Clone)]
 pub(crate) struct GaloisField {
     field_size: usize,

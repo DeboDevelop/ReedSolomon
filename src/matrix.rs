@@ -4,7 +4,7 @@ use crate::galois::GaloisField;
 pub(crate) struct Matrix {
     rows: usize,
     cols: usize,
-    data: Vec<Vec<u8>>,
+    pub(crate) data: Vec<Vec<u8>>,
 }
 
 impl Matrix {
@@ -191,7 +191,7 @@ impl Matrix {
     pub(crate) fn mul(&self, right: Matrix, gf: GaloisField) -> Matrix {
         if self.cols != right.rows {
             panic!(
-                "Colomn count on left has to be same as row count on right. left column: {}, right row: {}",
+                "Column count on left has to be same as row count on right. left column: {}, right row: {}",
                 self.cols, right.rows
             )
         }
@@ -229,13 +229,13 @@ impl Matrix {
         if self.rows != self.cols {
             panic!("Can't invert a non-square matrix")
         }
-        // Create a working matrix by augmenting this one with an identity matrix on the right.
+        // Create a working matrix by augmenting an identity matrix on the right on self.
         let mut work = self.new_augmented_matrix(Matrix::new_identity(self.rows));
 
-        // Do Gaussian elimination to transform the left half into an identity matrix.
+        // Use Gaussian elimination to transform the left half of working matrix into an identity matrix.
         work.gauss_elim(gf);
 
-        // The right half is now the inverse.
+        // The right half is now the inverse matrix.
         work.new_sub_matrix(0, self.rows, self.cols, self.cols * 2)
     }
 
@@ -275,8 +275,7 @@ impl Matrix {
     /// matrix.gauss_elim(gf8);
     /// ```
     fn gauss_elim(&mut self, gf: GaloisField) {
-        // Clear out the part below the main diagonal and scale the main
-        // diagonal to be 1.
+        // Clear out the lower triangle below the main diagonal and scale the main diagonal to be 1.
         for r in 0..self.rows {
             // If the element on the diagonal is 0, find a row below
             // that has a non-zero and swap them.
@@ -300,7 +299,7 @@ impl Matrix {
                 }
             }
             // Make everything below the 1 be a 0 by subtracting
-            // a multiple of it.  (Subtraction and addition are
+            // a multiple of it. (Subtraction and addition are
             // both exclusive or in the Galois field.)
             for r_below in r + 1..self.rows {
                 if self.data[r_below][r] != 0 {
@@ -312,7 +311,7 @@ impl Matrix {
                 }
             }
         }
-        // Now clear the part above the main diagonal.
+        // Now clear the upper triangle above the main diagonal.
         for d in 0..self.rows {
             for r_above in 0..d {
                 if self.data[r_above][d] != 0 {
