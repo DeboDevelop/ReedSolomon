@@ -1,8 +1,8 @@
-pub mod matrix;
 pub mod galois;
+pub mod matrix;
 
-use crate::matrix::Matrix;
 use crate::galois::GaloisField;
+use crate::matrix::Matrix;
 
 /// A Struct to represent and store data for Reed Solomon Erasure Coding.
 pub struct ReedSolomon {
@@ -27,12 +27,12 @@ impl ReedSolomon {
     /// ```
     /// use crate::ReedSolomon;
     /// use crate::galois::GaloisField;
-    /// 
+    ///
     /// let gf = GaloisField::new();
     /// let matrix = ReedSolomon::build_matrix(4, 6, gf);
     /// ```
     pub(crate) fn build_matrix(data_shards: usize, total_shards: usize, gf: GaloisField) -> Matrix {
-        // Start with a Vandermonde matrix but this matrix doesn't have the property 
+        // Start with a Vandermonde matrix but this matrix doesn't have the property
         // that the data shards are unchanged after encoding.
         let vandermonde = Matrix::new_vandermonde(total_shards, data_shards, gf);
 
@@ -54,7 +54,7 @@ impl ReedSolomon {
     /// # Example
     /// ```
     /// use reed_solomon::ReedSolomon;;
-    /// 
+    ///
     /// let matrix = ReedSolomon::new(4, 2);
     /// ```
     pub fn new(data_shards: usize, parity_shards: usize) -> ReedSolomon {
@@ -66,7 +66,7 @@ impl ReedSolomon {
         }
         // More than 256 will lead to duplicate rows in the Vandermonde matrix,
         // which would then lead to duplicate rows in the built matrix.
-        // Any subset of the rows containing the duplicate rows would 
+        // Any subset of the rows containing the duplicate rows would
         // be singular and thus non-invertible.
         if data_shards + parity_shards > 256 {
             panic!("too many shards - max is 256")
@@ -93,7 +93,14 @@ mod tests {
     #[test]
     fn test_new() {
         let rs = ReedSolomon::new(4, 2);
-        let exp_res: [[u8; 4]; 6] = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1], [27, 28, 18, 20], [28, 27, 20, 18]];
+        let exp_res: [[u8; 4]; 6] = [
+            [1, 0, 0, 0],
+            [0, 1, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+            [27, 28, 18, 20],
+            [28, 27, 20, 18],
+        ];
 
         for (row_index, row) in rs.matrix.data.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
