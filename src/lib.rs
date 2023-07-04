@@ -9,6 +9,7 @@ pub struct ReedSolomon {
     data_shard_count: usize,
     parity_shard_count: usize,
     total_shard_count: usize,
+    parity: Matrix,
     gf: GaloisField,
     matrix: Matrix,
 }
@@ -55,7 +56,7 @@ impl ReedSolomon {
     /// ```
     /// use reed_solomon::ReedSolomon;;
     ///
-    /// let matrix = ReedSolomon::new(4, 2);
+    /// let rs = ReedSolomon::new(4, 2);
     /// ```
     pub fn new(data_shards: usize, parity_shards: usize) -> ReedSolomon {
         if data_shards == 0 {
@@ -76,12 +77,108 @@ impl ReedSolomon {
         let total_shards = data_shards + parity_shards;
 
         let matrix = Self::build_matrix(data_shards, total_shards, gf);
+
+        let mut parity = Matrix::new(parity_shards, data_shards);
+        for i in 0..parity_shards {
+            parity.data[i] = matrix.data[data_shards + i].clone();
+        }
+
         ReedSolomon {
             data_shard_count: data_shards,
             parity_shard_count: parity_shards,
             total_shard_count: total_shards,
+            parity,
             gf,
             matrix,
+        }
+    }
+
+    /// Check the consistency of shards passed to other methods.
+    /// # Arguments
+    ///
+    /// * `shards` - All shards including data and parity shards.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::ReedSolomon;;
+    ///
+    /// let rs = ReedSolomon::new(2, 2);
+    /// let shards = vec![vec![0, 1, 2], vec![3, 4, 5], vec![200, 201, 203], vec![100, 101, 102]];
+    /// rs.check_shard_sizes(shards);
+    /// ```
+    pub(crate) fn check_shard_sizes(&self, shards: &Vec<Vec<u8>>) {
+        if shards.len() != self.total_shard_count {
+            panic!("Wrong no. of shards");
+        }
+
+        let shard_elem_len = shards[0].len();
+        if shard_elem_len == 0 {
+            panic!("Empty Shard");
+        }
+        for elem in shards.iter() {
+            if (*elem).len() != shard_elem_len {
+                panic!("Length of shards are different");
+            }
+        }
+    }
+
+    /// Encodes checksum shards for a set of data shards.
+    /// # Arguments
+    ///
+    /// * `shards` - All shards including data and parity shards. Parity shards will be overwritten.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::ReedSolomon;;
+    ///
+    /// let rs = ReedSolomon::new(2, 2);
+    /// let shards = vec![vec![0, 1, 2], vec![3, 4, 5], vec![200, 201, 203], vec![100, 101, 102]];
+    /// let encoded_shards = rs.encode(shards);
+    /// ```
+    pub fn encode(&self, shards: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+        self.check_shard_sizes(&shards);
+
+        let mut inputs = shards[..self.data_shard_count].to_vec();
+        let mut outputs = shards[self.data_shard_count..].to_vec();
+
+        self.encode_shards(&inputs, &mut outputs);
+
+        inputs.extend(outputs);
+
+        inputs
+    }
+
+    /// Encodes checksum shards for a given input (data shards) and modifies the output.
+    /// # Arguments
+    ///
+    /// * `inputs` - Data shards.
+    /// * `outputs` - Parity shards (to be overwritten).
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::ReedSolomon;;
+    ///
+    /// let rs = ReedSolomon::new(2, 2);
+    /// let inputs = vec![vec![0, 1, 2], vec![3, 4, 5]];
+    /// let mut outputs = vec![vec![200, 201, 203], vec![100, 101, 102]];
+    /// rs.encode_shards(&inputs, &mut outputs);
+    /// ```
+    pub(crate) fn encode_shards(&self, inputs: &Vec<Vec<u8>>, outputs: &mut Vec<Vec<u8>>) {
+        for inp in 0..self.data_shard_count {
+            for out in 0..self.parity_shard_count {
+                let parity_byte = self.parity.data[out][inp];
+                if inp == 0 {
+                    for (i_byte, input) in inputs[inp].iter().enumerate() {
+                        outputs[out][i_byte] = self.gf.mul(parity_byte, *input);
+                    }
+                } else {
+                    let mut val: u8;
+                    for (i_byte, input) in inputs[inp].iter().enumerate() {
+                        val = self.gf.mul(parity_byte, *input);
+                        outputs[out][i_byte] = GaloisField::add(outputs[out][i_byte], val);
+                    }
+                }
+            }
         }
     }
 }
@@ -103,6 +200,28 @@ mod tests {
         ];
 
         for (row_index, row) in rs.matrix.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+        for (row_index, row) in rs.parity.data.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(exp_res[rs.data_shard_count + row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_encode() {
+        let rs = ReedSolomon::new(2, 2);
+        let shards = vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![200, 201, 203],
+            vec![100, 101, 102],
+        ];
+        let encoded_shard = rs.encode(shards);
+        let exp_res: [[u8; 3]; 4] = [[0, 1, 2], [3, 4, 5], [6, 11, 12], [5, 14, 11]];
+        for (row_index, row) in encoded_shard.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
                 assert_eq!(exp_res[row_index][col_index], elem);
             }
