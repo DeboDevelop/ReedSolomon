@@ -54,7 +54,7 @@ impl ReedSolomon {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::ReedSolomon;;
+    /// use reed_solomon::ReedSolomon;
     ///
     /// let rs = ReedSolomon::new(4, 2);
     /// ```
@@ -100,7 +100,7 @@ impl ReedSolomon {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::ReedSolomon;;
+    /// use reed_solomon::ReedSolomon;
     ///
     /// let rs = ReedSolomon::new(2, 2);
     /// let shards = vec![vec![0, 1, 2], vec![3, 4, 5], vec![200, 201, 203], vec![100, 101, 102]];
@@ -123,13 +123,14 @@ impl ReedSolomon {
     }
 
     /// Encodes checksum shards for a set of data shards.
+    /// Returns all the shards including all data and parity shards.
     /// # Arguments
     ///
     /// * `shards` - All shards including data and parity shards. Parity shards will be overwritten.
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::ReedSolomon;;
+    /// use reed_solomon::ReedSolomon;
     ///
     /// let rs = ReedSolomon::new(2, 2);
     /// let shards = vec![vec![0, 1, 2], vec![3, 4, 5], vec![200, 201, 203], vec![100, 101, 102]];
@@ -141,7 +142,7 @@ impl ReedSolomon {
         let mut inputs = shards[..self.data_shard_count].to_vec();
         let mut outputs = shards[self.data_shard_count..].to_vec();
 
-        self.encode_shards(&inputs, &mut outputs);
+        self.encode_shards(&self.parity, &inputs, &mut outputs);
 
         inputs.extend(outputs);
 
@@ -156,17 +157,17 @@ impl ReedSolomon {
     ///
     /// # Example
     /// ```
-    /// use reed_solomon::ReedSolomon;;
+    /// use reed_solomon::ReedSolomon;
     ///
     /// let rs = ReedSolomon::new(2, 2);
     /// let inputs = vec![vec![0, 1, 2], vec![3, 4, 5]];
     /// let mut outputs = vec![vec![200, 201, 203], vec![100, 101, 102]];
     /// rs.encode_shards(&inputs, &mut outputs);
     /// ```
-    pub(crate) fn encode_shards(&self, inputs: &Vec<Vec<u8>>, outputs: &mut Vec<Vec<u8>>) {
+    pub(crate) fn encode_shards(&self, parity: &Matrix, inputs: &Vec<Vec<u8>>, outputs: &mut Vec<Vec<u8>>) {
         for inp in 0..self.data_shard_count {
             for out in 0..self.parity_shard_count {
-                let parity_byte = self.parity.data[out][inp];
+                let parity_byte = (*parity).data[out][inp];
                 if inp == 0 {
                     for (i_byte, input) in inputs[inp].iter().enumerate() {
                         outputs[out][i_byte] = self.gf.mul(parity_byte, *input);
@@ -180,6 +181,142 @@ impl ReedSolomon {
                 }
             }
         }
+    }
+
+    /// Check the no. and consistency of shards passed to decode methods.
+    /// # Arguments
+    ///
+    /// * `shards` - Given shards including data and parity shards. Some shards might be missing.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::ReedSolomon;
+    ///
+    /// let rs = ReedSolomon::new(2, 2);
+    /// let shards = vec![vec![0, 1, 2], vec![], vec![6, 11, 12], vec![]];
+    /// rs.check_shard_sizes_for_decode(shards);
+    /// ```
+    pub(crate) fn check_shard_sizes_for_decode(&self, shards: &Vec<Vec<u8>>) -> (usize, usize) {
+        if shards.len() < self.total_shard_count {
+            panic!("Too few no. of shards");
+        }
+        if shards.len() > self.total_shard_count {
+            panic!("Too many no. of shards");
+        }
+
+        let mut shard_elem_len = 0;
+        let mut present: usize = 0;
+        for elem in shards.iter() {
+            if (*elem).len() != 0 {
+                present += 1;
+                shard_elem_len = (*elem).len();
+            }
+        }
+        let mut same_size: usize = 0;
+        for elem in shards.iter() {
+            if (*elem).len() == shard_elem_len {
+                same_size += 1;
+            }
+        }
+        if present != same_size {
+            panic!("Length of shards are different");
+        }
+        if present < self.data_shard_count {
+            panic!("Too few no. of shards");
+        }
+
+        (present, shard_elem_len)
+    }
+
+    /// Takes shards as input and recover any data or parity shards that is missing.
+    /// Returns all the shards including all data and parity shards.
+    /// # Arguments
+    ///
+    /// * `shards` - Given shards including data and parity shards. Some shards might be missing.
+    ///
+    /// # Example
+    /// ```
+    /// use reed_solomon::ReedSolomon;
+    ///
+    /// let rs = ReedSolomon::new(2, 2);
+    /// let inputs = vec![vec![0, 1, 2], vec![3, 4, 5]];
+    /// let mut outputs = vec![vec![200, 201, 203], vec![100, 101, 102]];
+    /// rs.encode_shards(&inputs, &mut outputs);
+    /// ```
+    pub fn decode(&self, shards: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+        let (present, shard_elem_len) = self.check_shard_sizes_for_decode(&shards);
+
+        if present == self.total_shard_count {
+            // All of the shards have data so we can return
+            return shards;
+        }
+
+        // Pull out the rows of the matrix that correspond 
+        // to the given shards and build a square matrix. 
+        // This matrix could be used to generate the shards 
+        // that we have from the original data.
+        //
+        // Create an array holding just the shards that 
+        // correspond to the rows of the submatrix. These
+        // shards will be the input to the decoding process 
+        // that re-creates the missing data shards.
+        let mut sub_matrix = Matrix::new(self.data_shard_count, self.data_shard_count);
+        let mut sub_shard: Vec<Vec<u8>> = vec![vec![]; self.data_shard_count];
+        let mut sub_matrix_row: usize = 0;
+        let mut matrix_row: usize = 0;
+        while matrix_row < self.total_shard_count && sub_matrix_row < self.data_shard_count {
+            if shards[matrix_row].len() != 0 {
+                sub_matrix.data[sub_matrix_row] = self.matrix.data[matrix_row].clone();
+                sub_shard[sub_matrix_row] = shards[matrix_row].clone();
+                sub_matrix_row += 1;
+            }
+            matrix_row += 1;
+        }
+        // Invert the matrix, so we can go from the encoded shards
+        // back to the original data. Then pull out the row that
+        // generates the shard that we want to decode. Since this 
+        // matrix maps back to the orginal data, it can be used
+        // to create a data shard, but not a parity shard.
+        let data_decode_matrix = sub_matrix.invert(self.gf);
+
+        // Re-create any data shards that were missing.
+        //
+        // The input to the coding is all of the shards we actually
+        // have, and the output is the missing data shards. The computation
+        // is done using the special decode matrix we just built.
+        let mut matrix_rows = Matrix::new(self.parity_shard_count, self.parity_shard_count);
+        let mut outputs: Vec<Vec<u8>> = vec![vec![0; shard_elem_len]; self.parity_shard_count];
+        let mut output_count: usize = 0;
+        for i in 0..self.data_shard_count {
+            if shards[i].len() == 0 {
+                matrix_rows.data[output_count] = data_decode_matrix.data[i].clone();
+                output_count += 1;
+            }
+        }
+        self.encode_shards(&matrix_rows, &sub_shard, &mut outputs);
+
+        // Filling the missing data shards.
+        output_count = 0;
+        let mut shards = shards;
+        for i in 0..self.data_shard_count {
+            if shards[i].len() == 0 {
+                shards[i] = outputs[output_count].clone();
+                output_count += 1;
+            }
+        }
+
+        // Filling missing parity shards with placeholder
+        for i in self.data_shard_count ..self.total_shard_count {
+            if shards[i].len() == 0 {
+                shards[i] = vec![0; shard_elem_len]
+            }
+        }
+        // Now that we have all of the data shards intact, we can
+        // compute any of the parity that is missing.
+        //
+        // The input to the coding is ALL of the data shards, including
+        // any that we just calculated. The output is all parity shards.
+        self.encode(shards)
     }
 }
 
@@ -224,6 +361,75 @@ mod tests {
         for (row_index, row) in encoded_shard.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
                 assert_eq!(exp_res[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_decode_missing_data() {
+        let rs = ReedSolomon::new(2, 2);
+        let shards = vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![200, 201, 203],
+            vec![100, 101, 102],
+        ];
+        let encoded_shard = rs.encode(shards.clone());
+        let broken_shards = vec![
+            vec![0, 1, 2],
+            vec![],
+            vec![6, 11, 12],
+            vec![5, 14, 11],
+        ];
+        let decoded_shards = rs.decode(broken_shards);
+        for (row_index, row) in decoded_shards.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(encoded_shard[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_decode_missing_parity() {
+        let rs = ReedSolomon::new(2, 2);
+        let shards = vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![200, 201, 203],
+            vec![100, 101, 102],
+        ];
+        let encoded_shard = rs.encode(shards.clone());
+        let broken_shards = vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![6, 11, 12],
+            vec![],
+        ];
+        let decoded_shards = rs.decode(broken_shards);
+        for (row_index, row) in decoded_shards.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(encoded_shard[row_index][col_index], elem);
+            }
+        }
+    }
+    #[test]
+    fn test_decode_missing_data_and_parity() {
+        let rs = ReedSolomon::new(2, 2);
+        let shards = vec![
+            vec![0, 1, 2],
+            vec![3, 4, 5],
+            vec![200, 201, 203],
+            vec![100, 101, 102],
+        ];
+        let encoded_shard = rs.encode(shards.clone());
+        let broken_shards = vec![
+            vec![0, 1, 2],
+            vec![],
+            vec![],
+            vec![5, 14, 11],
+        ];
+        let decoded_shards = rs.decode(broken_shards);
+        for (row_index, row) in decoded_shards.iter().enumerate() {
+            for (col_index, &elem) in row.iter().enumerate() {
+                assert_eq!(encoded_shard[row_index][col_index], elem);
             }
         }
     }
