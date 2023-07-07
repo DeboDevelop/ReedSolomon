@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::galois::GaloisField;
 
 /// A struct to represent Matrix
@@ -148,12 +149,9 @@ impl Matrix {
     /// let right = Matrix::new_identity(3);
     /// let augmented_matrix = left.new_augmented_matrix(right);
     /// ```
-    pub(crate) fn new_augmented_matrix(&self, right: Matrix) -> Matrix {
+    pub(crate) fn new_augmented_matrix(&self, right: Matrix) -> Result<Matrix, Error> {
         if self.rows != right.rows {
-            panic!(
-                "Row count of the matrices must match. Current row count, left: {}, right: {}",
-                self.rows, right.rows
-            )
+            return Err(Error::RowsMustMatch(self.rows, right.rows));
         }
 
         let cols = self.cols + right.cols;
@@ -167,11 +165,11 @@ impl Matrix {
             }
         }
 
-        Matrix {
+        Ok(Matrix {
             rows: self.rows,
             cols,
             data,
-        }
+        })
     }
 
     /// Multiply given 2 matrices - self, right.
@@ -188,12 +186,9 @@ impl Matrix {
     /// let right = Matrix::new_identity(3);
     /// let multiplied_matrix = left.mul(right);
     /// ```
-    pub(crate) fn mul(&self, right: Matrix, gf: GaloisField) -> Matrix {
+    pub(crate) fn mul(&self, right: Matrix, gf: GaloisField) -> Result<Matrix, Error> {
         if self.cols != right.rows {
-            panic!(
-                "Column count on left has to be same as row count on right. left column: {}, right row: {}",
-                self.cols, right.rows
-            )
+            return Err(Error::RowColMustMatch(self.cols, right.rows));
         }
 
         let mut res = Matrix::new(self.rows, right.cols);
@@ -208,7 +203,7 @@ impl Matrix {
             }
         }
 
-        res
+        Ok(res)
     }
 
     /// Returns the inverted matrix of self.
@@ -225,18 +220,18 @@ impl Matrix {
     /// let gf8 = GaloisField::new();
     /// let inv_matrix = matrix.invert(gf8);
     /// ```
-    pub(crate) fn invert(&self, gf: GaloisField) -> Matrix {
+    pub(crate) fn invert(&self, gf: GaloisField) -> Result<Matrix, Error> {
         if self.rows != self.cols {
-            panic!("Can't invert a non-square matrix")
+            return Err(Error::NonSquareMatrix);
         }
         // Create a working matrix by augmenting an identity matrix on the right on self.
-        let mut work = self.new_augmented_matrix(Matrix::new_identity(self.rows));
+        let mut work = self.new_augmented_matrix(Matrix::new_identity(self.rows))?;
 
         // Use Gaussian elimination to transform the left half of working matrix into an identity matrix.
-        work.gauss_elim(gf);
+        work.gauss_elim(gf)?;
 
         // The right half is now the inverse matrix.
-        work.new_sub_matrix(0, self.rows, self.cols, self.cols * 2)
+        Ok(work.new_sub_matrix(0, self.rows, self.cols, self.cols * 2))
     }
 
     /// Swap two given rows of Matrix data.
@@ -274,7 +269,7 @@ impl Matrix {
     /// let gf8 = GaloisField::new();
     /// matrix.gauss_elim(gf8);
     /// ```
-    fn gauss_elim(&mut self, gf: GaloisField) {
+    fn gauss_elim(&mut self, gf: GaloisField) -> Result<(), Error> {
         // Clear out the lower triangle below the main diagonal and scale the main diagonal to be 1.
         for r in 0..self.rows {
             // If the element on the diagonal is 0, find a row below
@@ -289,7 +284,7 @@ impl Matrix {
             }
             // If we couldn't find one, the matrix is singular.
             if self.data[r][r] == 0 {
-                panic!("The given matrix is singular");
+                return Err(Error::SingularMatrix);
             }
             // Scale to 1.
             if self.data[r][r] != 1 {
@@ -323,6 +318,8 @@ impl Matrix {
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -414,7 +411,11 @@ mod tests {
         let gf8 = GaloisField::new();
         let left = Matrix::new_vandermonde(3, 3, gf8);
         let right = Matrix::new_identity(3);
-        let res = left.new_augmented_matrix(right);
+        let result = left.new_augmented_matrix(right);
+        let res = match result {
+            Ok(x) => x,
+            Err(e) => panic!("{}", e),
+        };
         let exp_res: [[u8; 6]; 3] = [[1, 0, 0, 1, 0, 0], [1, 1, 1, 0, 1, 0], [1, 2, 4, 0, 0, 1]];
 
         assert_eq!(res.rows, 3);
@@ -432,7 +433,11 @@ mod tests {
         let gf8 = GaloisField::new();
         let left = Matrix::new_from_data(vec![vec![1, 2], vec![3, 4]]);
         let right = Matrix::new_from_data(vec![vec![5, 6], vec![7, 8]]);
-        let res = left.mul(right, gf8);
+        let result = left.mul(right, gf8);
+        let res = match result {
+            Ok(x) => x,
+            Err(e) => panic!("{}", e),
+        };
         let exp_res: [[u8; 2]; 2] = [[11, 22], [19, 42]];
 
         assert_eq!(res.rows, 2);
@@ -470,7 +475,11 @@ mod tests {
             vec![3, 100, 200],
             vec![45, 201, 123],
         ]);
-        let res = matrix.invert(gf8);
+        let result = matrix.invert(gf8);
+        let res = match result {
+            Ok(x) => x,
+            Err(e) => panic!("{}", e),
+        };
         let exp_res: [[u8; 3]; 3] = [[175, 133, 33], [130, 13, 245], [112, 35, 126]];
         let iden = Matrix::new_identity(matrix.rows);
 
@@ -480,7 +489,11 @@ mod tests {
             }
         }
 
-        let mul = matrix.mul(res, gf8);
+        let multiplied = matrix.mul(res, gf8);
+        let mul = match multiplied {
+            Ok(x) => x,
+            Err(e) => panic!("{}", e),
+        };
 
         for (row_index, row) in iden.data.iter().enumerate() {
             for (col_index, &elem) in row.iter().enumerate() {
