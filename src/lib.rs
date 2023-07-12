@@ -300,7 +300,7 @@ impl ReedSolomon {
         // The input to the coding is all of the shards we actually
         // have, and the output is the missing data shards. The computation
         // is done using the special decode matrix we just built.
-        let mut matrix_rows = Matrix::new(self.parity_shard_count, self.parity_shard_count);
+        let mut matrix_rows = Matrix::new(self.parity_shard_count, self.data_shard_count);
         let mut outputs: Vec<Vec<u8>> = vec![vec![0; shard_elem_len]; self.parity_shard_count];
         let mut output_count: usize = 0;
         for i in 0..self.data_shard_count {
