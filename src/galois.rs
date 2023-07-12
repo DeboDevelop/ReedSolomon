@@ -14,9 +14,6 @@ const IRREDUCIBLE_POLYNOMIAL: usize = 29;
 /// A Struct to represent the Galois Field
 #[derive(Copy, Clone)]
 pub(crate) struct GaloisField {
-    field_size: usize,
-    irre_poly: usize,
-    exp_table_size: usize,
     log_table: [u8; FIELD_SIZE],
     exp_table: [u8; EXP_TABLE_SIZE],
 }
@@ -94,9 +91,6 @@ impl GaloisField {
         let exp_table = gen_exp_table(&log_table);
 
         GaloisField {
-            field_size: FIELD_SIZE,
-            irre_poly: IRREDUCIBLE_POLYNOMIAL,
-            exp_table_size: EXP_TABLE_SIZE,
             log_table,
             exp_table,
         }
@@ -115,22 +109,6 @@ impl GaloisField {
     /// let res = GaloisField::add(1, 1);
     /// ```
     pub(crate) fn add(a: u8, b: u8) -> u8 {
-        a ^ b
-    }
-
-    /// Subtract 1 element from another in the field.
-    /// # Arguments
-    ///
-    /// * `a` - Minuend
-    /// * `b` - Subtrahend
-    ///
-    /// # Example
-    /// ```
-    /// use crate::galois::GaloisField;
-    ///
-    /// let res = GaloisField::sub(1, 1);
-    /// ```
-    pub(crate) fn sub(a: u8, b: u8) -> u8 {
         a ^ b
     }
 
@@ -285,9 +263,6 @@ mod tests {
     #[test]
     fn test_gf_new() {
         let gf8 = GaloisField::new();
-        assert_eq!(FIELD_SIZE, gf8.field_size);
-        assert_eq!(IRREDUCIBLE_POLYNOMIAL, gf8.irre_poly);
-        assert_eq!(EXP_TABLE_SIZE, gf8.exp_table_size);
         for i in 0..FIELD_SIZE {
             assert_eq!(EXPECTED_LOG_RES[i], gf8.log_table[i]);
         }
@@ -300,12 +275,6 @@ mod tests {
         assert_eq!(0, GaloisField::add(1, 1));
         assert_eq!(26, GaloisField::add(21, 15));
         assert_eq!(68, GaloisField::add(120, 60));
-    }
-    #[test]
-    fn test_sub() {
-        assert_eq!(0, GaloisField::sub(1, 1));
-        assert_eq!(26, GaloisField::sub(21, 15));
-        assert_eq!(68, GaloisField::sub(120, 60));
     }
     #[test]
     fn test_mul() {
