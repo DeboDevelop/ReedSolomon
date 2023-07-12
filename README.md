@@ -42,8 +42,11 @@ let decoded_shard = match decoded_shard_result {
 ### Special Thanks To
 
 Backblaze
+
 Klaus Post
+
 James S. Plank
+
 Ying Ding
 
 ### License
